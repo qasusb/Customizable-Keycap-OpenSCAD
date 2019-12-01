@@ -1,0 +1,395 @@
+//globals
+
+//basic key variables
+//key size		
+	//1 for 1u      //2 for 2u      //etc
+key_size = 1;
+//true key height (without concave)
+key_height_true = 9;
+//type of stabilizer the keys needs
+    //0 for none    //1 for 2u      //2 for 6u      //3 for 6.25u       //4 for 6.5u
+stabilizer_u_type = 0;
+
+//text variables
+//main text that will appear on key (leave blank for blank key)
+text_input = "1";
+//second text input (leave blank if not wanted)
+    //this is to be used for keys with 2 functions, such as 1 and !
+text_input2 = "";
+//increase the vertical gap between both text inputs (leave as 0 if only one text input)
+x_axis_difference = 0;
+//font type (must be included in the OpenSCAD font list, Help->Font List)
+text_font = "Ariel";
+//font style (must also be in the font list)
+text_style = "Bold";
+//spacing between the letters
+text_spacing = 1;
+//size of the text
+text_size = 5;
+//height of the text
+text_height = 0.45;
+//amount text is translated back along y axis
+    //this is to center the text better as the program often does not center well
+y_axis_difference = 0;
+y_axis_difference2 = 0;
+
+//3d printing variables
+//type of brim
+    //0 for no brim     //1 for brim under the key       //2 for a large brim
+brim_type = 0;
+//walls to stop oozing from second nozzle
+    //0 for no walls        //1 for walls
+ooze_walls = 0;
+
+
+//complex key variables (recommended settings)
+//difference between top of key and bottom
+    //this determines the angle of the slope when combined with the key height
+slope_base = 2.5;
+//radius of cylinder used in minkowski function
+minkowski_cylinder_radius = 1;
+//height of cylinder used in minkowski function
+    //changes the height of the bottom 'ring' of the key
+minkowski_cylinder_height = 0.8;
+//determines the smoothness of curves for the minkowski
+$fn = 128;
+//thickness of the key walls
+key_wall_thickness = 1.5;
+//determines amount of concave on the top of the key
+    //bigger values mean more extreme concave, reccommended [2-8]
+concave_sphere_height = 5;
+//amount sphere dips into the top of the key
+    //this also affects the height of the key
+concave_depth = 1;
+//millimetres between bottom of concave and top of inside
+key_top_thickness = 2;
+
+//stem variables (recommended settings)
+//x axis cross_length
+x_cr_l = 5;
+//x axis cross_width
+x_cr_w = 1.3;
+//y axis_cross_length
+y_cr_l = 5;
+//y axis_cross_width
+y_cr_w = 1.3;
+//cross depth, note:stem height is 3.4mm on cherry mx switches
+cross_depth = 4;
+//extra stem length (total of each side)
+extra_stem_length = 1;
+
+
+////
+
+
+//more variables (NOTHING TO BE CHANGED PAST THIS POINT)
+key_base_length = (key_size*19.05)-1.05;
+key_base_width = 18;
+mc_r = minkowski_cylinder_radius;
+mc_h = minkowski_cylinder_height;
+
+kb_l = key_base_width-(2*mc_r);
+kb_w = key_base_length-(2*mc_r);
+k_h = key_height_true-mc_h;
+sl_b = slope_base;
+kw_t = key_wall_thickness;
+//value sphere is translated upwards (NOT DEPTH)
+cs_h = key_height_true-concave_depth;
+//extra stem height
+stem_extra_height = key_height_true-concave_depth-key_top_thickness-cross_depth;
+
+//scale factors that the module:rough_shape is scaled by to form the inside of the key (negative_inside)
+l_sf = ((key_base_width)-(2*kw_t))/kb_l;
+w_sf = ((key_base_length)-(2*kw_t))/kb_w;
+h_sf = (key_height_true-concave_depth-key_top_thickness)/k_h;
+
+//general shape
+module four_slopes() {
+    rotate(a=(270+atan(k_h/sl_b)), v=[1, 0, 0]) { 
+        translate([0, -sl_b, 0]) {
+            cube([kb_l, sl_b, k_h+10]);
+        }
+    }
+    translate([0, kb_w, 0]) {
+        rotate(a=(90-atan(k_h/sl_b)), v=[1, 0, 0]) { 
+            cube([kb_l, sl_b, k_h+10]);
+        }
+    }
+    rotate(a = (90-atan(k_h/sl_b)), v=[0, 1, 0]) {
+        translate([-sl_b, 0, 0]) {
+            cube([sl_b, kb_w, k_h+10]);
+        }
+    }
+    translate([kb_l, 0, 0]) {
+        rotate(a=(270+atan(k_h/sl_b)), v=[0, 1, 0]) {
+            cube([sl_b, kb_w, k_h+10]);
+        }
+    }
+}
+
+module rough_shape() {
+    difference() {
+        cube([kb_l, kb_w, k_h]);
+        four_slopes();
+    }
+}
+
+module rough_shape_transformed() {
+    translate([mc_r, mc_r, 0]) {
+        rough_shape();
+    }
+}
+
+module curved_shape() {
+    minkowski() {
+        rough_shape_transformed();
+        cylinder(r=mc_r, h=mc_h);
+    }
+}
+
+module negative_inside() {
+    translate([kw_t, kw_t, 0]) {
+        scale([l_sf, w_sf, h_sf]) {
+        rough_shape();
+        }
+    }
+}
+
+module curved_hollowed_shape() {
+    difference() {
+        curved_shape();
+        negative_inside();
+    }
+}
+
+module concave_sphere() {
+    translate([key_base_width/2, key_base_length/2, concave_sphere_height+cs_h]) {
+        scale([key_base_width, key_base_length, concave_sphere_height]) {
+            sphere(1, $fn=128);
+        }
+    }
+}
+
+module concaved_hollowed_key() {
+    difference() {
+        curved_hollowed_shape();
+        concave_sphere();
+    }
+}
+
+//stem
+module stem_center() {
+    difference() {
+        union() {
+            translate([0, 0, (cross_depth+stem_extra_height)/2]) {
+                cube([x_cr_l, y_cr_l+extra_stem_length, cross_depth+stem_extra_height], center=true);
+            }
+        }
+        union() {
+            translate([0, 0, cross_depth/2]) {
+                cube([x_cr_l, x_cr_w, cross_depth], center=true);
+            }
+            translate([0, 0, cross_depth/2]) {
+                cube([y_cr_w, y_cr_l, cross_depth], center=true);
+            }
+        }
+    }        
+}
+
+module stem1() {
+    translate([key_base_width/2, key_base_length/2, 0]) {
+        stem_center();
+    }
+}
+
+module stem2() {
+    translate([0, -12, 0]) {
+        stem1();
+    }
+}
+
+module stem3() {
+    translate([0, 12, 0]) {
+        stem1();
+    }
+}
+
+module stem4() {
+    translate ([0, -49, 0]) {
+        stem1();
+    }
+}
+
+module stem5() {
+    translate ([0, 49, 0]) {
+        stem1();
+    }
+}
+
+module stem6() {
+    translate ([0, -50, 0]) {
+        stem1();
+    }
+}
+
+module stem7() {
+    translate ([0, 50, 0]) {
+        stem1();
+    }
+}
+
+module stem8() {
+    translate ([0, -52.5, 0]) {
+        stem1();
+    }
+}
+
+module stem9() {
+    translate ([0, 52.5, 0]) {
+        stem1();
+    }
+}
+
+//text
+module writing() {
+    translate([(key_base_width/2)-x_axis_difference, (key_base_length/2)-y_axis_difference, key_height_true-concave_depth]) {
+        linear_extrude(height=text_height) {
+            rotate(a=90, v=[0, 0, 1]) {
+                    text(text_input, font=text_font, style=text_style, halign="center", valign="center", spacing=text_spacing, size=text_size);
+            }
+        }
+    }
+    translate([(key_base_width/2)+x_axis_difference, (key_base_length/2)-y_axis_difference2, key_height_true-concave_depth]) {
+        linear_extrude(height=text_height) {
+            rotate(a=90, v=[0, 0, 1]) {
+                text(text_input2, font=text_font, style=text_style, halign="center", valign="center", spacing=text_spacing, size=text_size);
+            }
+        }
+    }
+}
+
+//brim and walls
+module inner_brim() {
+    difference() {
+        union() {
+            translate([key_wall_thickness, key_wall_thickness, 0]) {
+                cube([key_base_width-(2*key_wall_thickness), key_base_length-(2*key_wall_thickness), 0.1]);
+            }
+        }
+        union() {
+            translate([key_base_width/2, key_base_length/2, 0.1/2]) {
+                cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+            }
+            if (stabilizer_u_type==0) {
+            }
+            else if (stabilizer_u_type==1) {
+                translate([key_base_width/2, (key_base_length/2)-12, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+                translate([key_base_width/2, (key_base_length/2)+12, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+            }
+            else if (stabilizer_u_type==2) {
+                translate([key_base_width/2, (key_base_length/2)-49, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+                translate([key_base_width/2, (key_base_length/2)+49, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+            }
+            else if (stabilizer_u_type==3) {
+                translate([key_base_width/2, (key_base_length/2)-50, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+                translate([key_base_width/2, (key_base_length/2)+50, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+            }
+            else if (stabilizer_u_type==4) {
+                translate([key_base_width/2, (key_base_length/2)-52.5, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+                translate([key_base_width/2, (key_base_length/2)+52.5, 0.1/2]) {
+                    cube([x_cr_l, y_cr_l+extra_stem_length, 0.1], center=true);
+                }
+            }
+        }
+    }
+}
+
+module large_brim() {
+    difference() {
+        union() {
+            translate([key_base_width/2, key_base_length/2, 0.1/2]) {
+                cube([key_base_width+13, key_base_length+5, 0.1], center=true);
+            }
+        }
+        union() {
+            curved_shape();
+        }
+    }
+    inner_brim();
+}
+
+module walls_for_ooze() {
+    translate([-2, key_base_length/2, key_height_true/2]) {
+        cube([2, key_base_length+1, key_height_true], center=true);
+        
+    }
+    translate([-4, key_base_length/2, 0.25]) {
+        cube([4, key_base_length+1, 0.5], center=true);
+    }
+    translate([key_base_width+2, key_base_length/2, key_height_true/2]) {
+        cube([2, key_base_length+1, key_height_true], center=true);
+    }
+    translate([key_base_width+4, key_base_length/2, 0.25]) {
+        cube([4, key_base_length+1, 0.5], center=true);
+    }
+}
+
+//final key
+module final_key() {
+    concaved_hollowed_key();
+    stem1();
+    if (stabilizer_u_type==0) {
+    }
+    else if (stabilizer_u_type==1) {
+        stem2();
+        stem3();
+    }
+    else if (stabilizer_u_type==2) {
+        stem4();
+        stem5();
+    }
+    else if (stabilizer_u_type==3) {
+        stem6();
+        stem7();
+    }
+    else if (stabilizer_u_type==4) {
+        stem8();
+        stem9();
+    }
+    if (brim_type==0) {
+    }
+    else if (brim_type==1) {
+        inner_brim();
+    }
+    else if (brim_type==2) {
+        large_brim();
+    }
+    if (ooze_walls==0) {
+    }
+    else if (ooze_walls==1) {
+        walls_for_ooze();
+    }
+    if (text_input=="") {
+    }
+    else {
+        writing();
+    }
+}
+
+////
+
+final_key();
