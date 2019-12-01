@@ -1,0 +1,69 @@
+//globals
+
+x_cr_l = 5;                 //x axis cross_length
+
+x_cr_w = 1.3;               //x axis cross_width
+
+y_cr_l = 5;                 //y axis_cross_length
+
+y_cr_w = 1.3;               //y axis_cross_width
+
+
+
+cross_depth = 4;            //cross_depth, stem height is 3.4mm on cherry mx switches
+
+extra_stem_length = 1;      //extra stem length (total of each side)
+
+
+
+st_r = 2.8;                 //stem_radius
+
+stem_extra_height = 3;      //stem_height
+
+
+
+module cross() {
+
+    translate([0, 0, cross_depth/2]) {
+
+        cube([x_cr_l, x_cr_w, cross_depth], center=true);
+
+    }
+
+    translate([0, 0, cross_depth/2]) {
+
+        cube([y_cr_w, y_cr_l, cross_depth], center=true);
+
+    }
+
+}
+
+
+
+module stem_cube() {
+
+    translate([0, 0, (cross_depth+stem_extra_height)/2]) {
+
+        cube([x_cr_l, y_cr_l+extra_stem_length, cross_depth+stem_extra_height], center=true);
+
+    }
+
+}
+
+
+
+module stem() {
+
+    difference() {
+
+        stem_cube();
+
+        cross();
+
+    }        
+
+}
+
+
+
+stem();
